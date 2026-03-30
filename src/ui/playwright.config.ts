@@ -25,6 +25,8 @@ import { defineConfig, devices } from "@playwright/test";
  * - Tests should survive major UI refactors (virtualization, pagination, etc.)
  * - Tests run fast (parallel, single browser for CI)
  */
+const collectCoverage = !!process.env.E2E_COVERAGE;
+
 export default defineConfig({
   testDir: "./e2e",
   // Run tests in parallel for speed
@@ -39,6 +41,12 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   // Global timeout - tests should be fast
   timeout: 10_000,
+
+  // Clean stale coverage cache, then generate report after all tests complete
+  ...(collectCoverage && {
+    globalSetup: "./e2e/global-setup.ts",
+    globalTeardown: "./e2e/global-teardown.ts",
+  }),
 
   use: {
     // Base URL for navigation

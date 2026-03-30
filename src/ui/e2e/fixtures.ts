@@ -15,7 +15,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { test as base, expect as baseExpect, type Page } from "@playwright/test";
+import MCR from "monocart-coverage-reports";
 import type { PoolResponse, ResourcesResponse } from "@/lib/api/generated";
+import coverageOptions, { filterCoverageEntries } from "./coverage.config";
 
 // Default data for when tests don't specify their own
 import {
@@ -96,7 +98,44 @@ export const test = base.extend<{
   scenarioState: ScenarioState;
   withData: (data: TestScenarioData) => Promise<void>;
   withAuth: (auth: AuthScenarioData) => Promise<void>;
+  _coverageFixture: void;
 }>({
+  // V8 coverage collection — activated by E2E_COVERAGE env var.
+  // Starts JS/CSS coverage before each test, collects after, and writes to MCR cache.
+  // The global-teardown.ts then merges all cached data into the final report.
+  _coverageFixture: [async ({ context }, use) => {
+    const isChromium = test.info().project.name === "chromium";
+    const collectCoverage = isChromium && !!process.env.E2E_COVERAGE;
+
+    if (!collectCoverage) {
+      await use();
+      return;
+    }
+
+    const handlePageEvent = async (page: Page) => {
+      await Promise.all([
+        page.coverage.startJSCoverage({ resetOnNavigation: false }),
+        page.coverage.startCSSCoverage({ resetOnNavigation: false }),
+      ]);
+    };
+
+    context.on("page", handlePageEvent);
+    await use();
+    context.off("page", handlePageEvent);
+
+    const coverageList = await Promise.all(
+      context.pages().map(async (page) => {
+        const jsCoverage = await page.coverage.stopJSCoverage();
+        const cssCoverage = await page.coverage.stopCSSCoverage();
+        return [...jsCoverage, ...cssCoverage];
+      }),
+    );
+
+    const mcr = MCR(coverageOptions);
+    const filtered = filterCoverageEntries(coverageList.flat());
+    await mcr.add(filtered);
+  }, { scope: "test", auto: true }],
+
   // Shared state for the test
   scenarioState: async ({}, use) => {
     await use({
