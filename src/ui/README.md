@@ -64,6 +64,7 @@ pnpm test:watch             # Unit tests in watch mode
 pnpm test:coverage          # Unit tests with coverage
 pnpm test:e2e               # E2E tests (Playwright, headless)
 pnpm test:e2e:headed        # E2E with visible browser
+pnpm test:e2e:coverage      # E2E tests with coverage (Playwright, headless)
 pnpm test:e2e:ui            # E2E interactive UI (recommended for dev)
 pnpm test:all               # Unit + E2E tests
 ```
